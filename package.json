@@ -1,0 +1,24 @@
+{
+  "name": "bot-dla-sayny",
+  "version": "1.0.0",
+  "description": "",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/islamkarakulov1-gif/telegram-bot.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/islamkarakulov1-gif/telegram-bot/issues"
+  },
+  "homepage": "https://github.com/islamkarakulov1-gif/telegram-bot#readme",
+  "dependencies": {
+    "node-telegram-bot-api": "^0.66.0"
+  }
+}
