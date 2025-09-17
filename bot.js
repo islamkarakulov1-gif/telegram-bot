@@ -1,54 +1,56 @@
 require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
-const express = require("express");
 
 const token = process.env.BOT_TOKEN;
 const ADMIN_ID = process.env.ADMIN_ID;
 
 const bot = new TelegramBot(token, { polling: true });
 
-// Храним состояние диалога
+// Храним состояние пользователей
 const userState = {};
-
-bot.onText(/\/start/, (msg) => {
-  const chatId = msg.chat.id;
-  userState[chatId] = { step: "name" };
-  bot.sendMessage(chatId, "Здравствуйте! Как вас зовут?");
-});
 
 bot.on("message", (msg) => {
   const chatId = msg.chat.id;
 
+  // Игнорируем команды (/что-то)
   if (msg.text.startsWith("/")) return;
 
   const state = userState[chatId];
-  if (!state) return;
 
+  // Если пользователь ещё не начал диалог → спрашиваем имя
+  if (!state) {
+    userState[chatId] = { step: "name" };
+    bot.sendMessage(chatId, "Здравствуйте! Как вас зовут?");
+    return;
+  }
+
+  // Шаг 1: имя
   if (state.step === "name") {
     state.name = msg.text;
     state.step = "phone";
     bot.sendMessage(chatId, "Спасибо! Теперь напишите номер телефона 📞");
-  } else if (state.step === "phone") {
+    return;
+  }
+
+  // Шаг 2: телефон
+  if (state.step === "phone") {
     state.phone = msg.text;
 
+    // Сообщение пользователю
     bot.sendMessage(
       chatId,
-      `Записал: ${state.name}, телефон: ${state.phone}. Мы свяжемся с вами 👍`
+      `Спасибо, ${state.name}! 🙂 Мы скоро с вами свяжемся 📞`
     );
 
+    // Сообщение админу
     bot.sendMessage(
       ADMIN_ID,
-      `Новая запись:\nИмя: ${state.name}\nТелефон: ${state.phone}`
+      `Новая заявка:\nИмя: ${state.name}\nТелефон: ${state.phone}`
     );
 
+    // Чистим состояние
     delete userState[chatId];
+    return;
   }
 });
 
-// 🔹 HTTP-заглушка для Render
-const app = express();
-app.get("/", (req, res) => res.send("Bot is running! 🚀"));
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Web server is running on port ${PORT}`);
-});
