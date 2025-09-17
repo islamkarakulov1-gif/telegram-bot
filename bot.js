@@ -1,6 +1,7 @@
+require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
 
-// токен и ID админа будут браться из переменных окружения Render
+// токен и ID админа берём из переменных окружения
 const token = process.env.BOT_TOKEN;
 const ADMIN_ID = process.env.ADMIN_ID;
 
@@ -18,7 +19,8 @@ bot.onText(/\/start/, (msg) => {
 bot.on("message", (msg) => {
   const chatId = msg.chat.id;
 
-  if (msg.text.startsWith("/")) return;
+  // Игнорируем команды
+  if (!msg.text || msg.text.startsWith("/")) return;
 
   const state = userState[chatId];
   if (!state) return;
@@ -37,7 +39,7 @@ bot.on("message", (msg) => {
 
     bot.sendMessage(
       ADMIN_ID,
-      ` Новая запись:\nИмя: ${state.name}\nТелефон: ${state.phone}`
+      `📩 Новая запись:\nИмя: ${state.name}\nТелефон: ${state.phone}`
     );
 
     delete userState[chatId];
