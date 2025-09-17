@@ -1,7 +1,7 @@
 require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
+const express = require("express");
 
-// токен и ID админа берём из переменных окружения
 const token = process.env.BOT_TOKEN;
 const ADMIN_ID = process.env.ADMIN_ID;
 
@@ -19,8 +19,7 @@ bot.onText(/\/start/, (msg) => {
 bot.on("message", (msg) => {
   const chatId = msg.chat.id;
 
-  // Игнорируем команды
-  if (!msg.text || msg.text.startsWith("/")) return;
+  if (msg.text.startsWith("/")) return;
 
   const state = userState[chatId];
   if (!state) return;
@@ -39,9 +38,17 @@ bot.on("message", (msg) => {
 
     bot.sendMessage(
       ADMIN_ID,
-      `📩 Новая запись:\nИмя: ${state.name}\nТелефон: ${state.phone}`
+      `Новая запись:\nИмя: ${state.name}\nТелефон: ${state.phone}`
     );
 
     delete userState[chatId];
   }
+});
+
+// 🔹 HTTP-заглушка для Render
+const app = express();
+app.get("/", (req, res) => res.send("Bot is running! 🚀"));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Web server is running on port ${PORT}`);
 });
