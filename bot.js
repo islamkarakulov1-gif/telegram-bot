@@ -1,4 +1,5 @@
 require('dotenv').config();
+console.log("🚀 Bot запускается...");
 const { Telegraf, Markup, session } = require('telegraf');
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -182,6 +183,8 @@ setInterval(() => {
 app.listen(PORT, () => {
   console.log(`✅ Сервер запущен на порту ${PORT}`);
   bot.launch();
+  console.log("✅ Bot запущен!");
+
 });
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
