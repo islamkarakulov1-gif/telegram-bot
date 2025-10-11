@@ -1,7 +1,3 @@
-// bot.js
-// Установка: npm init -y
-// npm i telegraf express body-parser dotenv node-fetch
-
 require('dotenv').config();
 const { Telegraf, Markup, session } = require('telegraf');
 const express = require('express');
