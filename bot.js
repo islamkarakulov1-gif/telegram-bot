@@ -5,7 +5,7 @@ const { Telegraf, Markup } = require('telegraf');
 const express = require('express');
 const bodyParser = require('body-parser');
 const fetch = require('node-fetch');
-const LocalSession = require('telegraf-session-local'); // ✅ добавлено
+const LocalSession = require('telegraf-session-local'); // ✅ локальные сессии
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
@@ -46,8 +46,8 @@ const VIDEO_BIG = "https://files.catbox.moe/ol975e.mp4";
 // =============================
 const bot = new Telegraf(BOT_TOKEN);
 
-// ✅ Храним сессии в локальном файле
-bot.use(new LocalSession({ database: 'sessions.json' }).middleware());
+// ✅ Сессии хранятся в памяти (а не в файле)
+bot.use(new LocalSession({ storage: LocalSession.storageMemory }).middleware());
 
 // Главное меню
 const mainMenu = Markup.inlineKeyboard([
