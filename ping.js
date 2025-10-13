@@ -2,7 +2,7 @@ const axios = require('axios');
 
 setInterval(async () => {
   try {
-    await axios.get("https://ТВОЙ-RENDER-URL.onrender.com/health");
+    await axios.get("https://telegram-bot-6xpj.onrender.com");
     console.log("✅ Ping success");
   } catch {
     console.log("⚠️ Ping failed");
