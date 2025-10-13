@@ -1,51 +1,53 @@
 require('dotenv').config();
 console.log("🚀 Bot запускается...");
-const { Telegraf, Markup, session } = require('telegraf');
+
+const { Telegraf, Markup } = require('telegraf');
 const express = require('express');
 const bodyParser = require('body-parser');
-const fetch = require('node-fetch'); // Для авто-пинга Render
+const fetch = require('node-fetch');
+const LocalSession = require('telegraf-session-local'); // ✅ добавлено
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
+const SELF_URL = process.env.SELF_URL;
 const PORT = process.env.PORT || 3000;
-const SELF_URL = process.env.SELF_URL; // твой URL на Render, например: https://my-sauna-bot.onrender.com
 
 // =============================
-// 🔗 КАРТИНКИ, ВИДЕО и КАРТЫ
+// ⚙️ Проверка переменных окружения
 // =============================
-
-// 🧖 Картинки для сауны поменьше (оставь свои ссылки)
-const IMG_SMALL_URLS = [
-  "https://ibb.co.com/LXBpNQ2c",
-  "https://ibb.co.com/svVz87HS",
-  "https://ibb.co.com/Kd76KQZ"
-];
-
-// 🧖 Картинки для сауны побольше
-const IMG_BIG_URLS = [
-  "https://ibb.co.com/F4KR98Jp",
-  "https://ibb.co.com/F4VrQ1kR",
-  "https://ibb.co.com/VpQtPP9M"
-];
-
-// 📍 Ссылки на карты
-const MAP_LINK_SMALL = "https://go.2gis.com/30tRT";
-const MAP_LINK_BIG = "https://go.2gis.com/OQSBA";
-
-// 🎥 ВИДЕО (вставь свои HTTPS ссылки на видео)
-const VIDEO_SMALL = "https://files.catbox.moe/y9slc1.mp4"; // 🔸 видео для сауны поменьше
-const VIDEO_BIG = "https://files.catbox.moe/ol975e.mp4";     // 🔹 видео для сауны побольше
-
-// =======================================
-// ⚙️ Проверка безопасности
-// =======================================
 if (!BOT_TOKEN || !OWNER_CHAT_ID || !SELF_URL) {
   console.error("❌ Укажи BOT_TOKEN, OWNER_CHAT_ID и SELF_URL в .env");
   process.exit(1);
 }
 
+// =============================
+// 🧖 Медиа для саун
+// =============================
+const IMG_SMALL_URLS = [
+  "https://i.ibb.co/ty5QdSg/IMG-20251010-WA0006.jpg",
+  "https://i.ibb.co/sp2ZfMXx/IMG-20251010-WA0004.jpg",
+  "https://i.ibb.co/bgmtyCZ7/IMG-20251010-WA0005.jpg"
+];
+
+const IMG_BIG_URLS = [
+  "https://i.ibb.co/R4zfm85d/IMG-20251003-WA0008.jpg",
+  "https://i.ibb.co/VpPhh83C/IMG-20251003-WA0004.jpg",
+  "https://i.ibb.co/23s0WjgT/IMG-20251003-WA0005.jpg"
+];
+
+const MAP_LINK_SMALL = "https://go.2gis.com/30tRT";
+const MAP_LINK_BIG = "https://go.2gis.com/OQSBA";
+
+const VIDEO_SMALL = "https://files.catbox.moe/y9slc1.mp4";
+const VIDEO_BIG = "https://files.catbox.moe/ol975e.mp4";
+
+// =============================
+// 🤖 Инициализация бота
+// =============================
 const bot = new Telegraf(BOT_TOKEN);
-bot.use(session());
+
+// ✅ Храним сессии в локальном файле
+bot.use(new LocalSession({ database: 'sessions.json' }).middleware());
 
 // Главное меню
 const mainMenu = Markup.inlineKeyboard([
@@ -54,7 +56,7 @@ const mainMenu = Markup.inlineKeyboard([
 ]);
 
 // =============================
-// 🧾 Информация о саунах
+// 🧾 Инфо о саунах
 // =============================
 function getSaunaInfo(type) {
   if (type === 'small') {
@@ -90,6 +92,8 @@ function getSaunaInfo(type) {
 // 👋 Приветствие
 // =============================
 bot.on('message', async (ctx) => {
+  if (ctx.session && ctx.session.step) return;
+
   const kaz = "Сәлем! Бізге хабарласқаныңыз үшін рахмет.";
   const rus = "Привет! Спасибо за обращение.";
   await ctx.reply(`${kaz}\n${rus}`, mainMenu);
@@ -103,21 +107,24 @@ bot.action(['sauna_small', 'sauna_big'], async (ctx) => {
   const type = ctx.callbackQuery.data === 'sauna_small' ? 'small' : 'big';
   const info = getSaunaInfo(type);
 
-  // Отправляем фото
-  for (const img of info.imgs) {
-    await ctx.replyWithPhoto({ url: img });
-  }
+  try {
+    for (const img of info.imgs) {
+      await ctx.replyWithPhoto({ url: img });
+    }
 
-  // Отправляем видео
-  if (info.video) {
-    await ctx.replyWithVideo({ url: info.video });
-  }
+    if (info.video) {
+      await ctx.replyWithVideo({ url: info.video });
+    }
 
-  const text = `*${info.title}*\n\n${info.text_ru}\n\n📍 [Посмотреть на карте](${info.map})`;
-  await ctx.replyWithMarkdown(text, Markup.inlineKeyboard([
-    [Markup.button.callback('📅 Забронировать', `book_${type}`)],
-    [Markup.button.callback('🔙 Назад', 'back_to_menu')]
-  ]));
+    const text = `*${info.title}*\n\n${info.text_ru}\n\n📍 [Посмотреть на карте](${info.map})`;
+    await ctx.replyWithMarkdown(text, Markup.inlineKeyboard([
+      [Markup.button.callback('📅 Забронировать', `book_${type}`)],
+      [Markup.button.callback('🔙 Назад', 'back_to_menu')]
+    ]));
+  } catch (err) {
+    console.error("Ошибка при отправке фото/видео:", err.message);
+    await ctx.reply("⚠️ Ошибка при загрузке изображений. Попробуйте позже.");
+  }
 });
 
 // =============================
@@ -140,7 +147,8 @@ bot.action(/book_(.+)/, async (ctx) => {
 });
 
 bot.on('text', async (ctx) => {
-  if (!ctx.session || !ctx.session.step) return;
+  if (!ctx.session.step) return;
+
   const step = ctx.session.step;
   const text = ctx.message.text;
 
@@ -159,32 +167,37 @@ bot.on('text', async (ctx) => {
   if (step === 'ask_hours') {
     ctx.session.booking.hours = text;
     const b = ctx.session.booking;
+
     const title = b.type === 'small' ? 'Сауна поменьше' : 'Сауна побольше';
     const summary = `🧖 Новая бронь:\n\n${title}\n👤 Имя: ${b.name}\n📞 Телефон: ${b.phone}\n⏰ Часов: ${b.hours}\n📍 Карта: ${b.type === 'small' ? MAP_LINK_SMALL : MAP_LINK_BIG}`;
+
     await ctx.telegram.sendMessage(OWNER_CHAT_ID, summary);
     await ctx.reply('✅ Спасибо! Ваша заявка отправлена.');
-    ctx.session = null;
+    ctx.session = {}; // очищаем сессию
   }
 });
 
 // =============================
-// 🌐 Express-сервер для Render
+// 🌐 Express для Render
 // =============================
 const app = express();
 app.use(bodyParser.json());
-app.get('/', (req, res) => res.send('Бот работает — Render используется для безопасности токенов'));
+
+app.get('/', (req, res) => res.send('✅ Бот работает — Render активен.'));
 app.get('/health', (req, res) => res.status(200).send('OK'));
 
-// 🕐 Авто-пинг Render каждые 5 минут
+// 🕐 Автопинг Render каждые 5 минут
 setInterval(() => {
-  fetch(`${SELF_URL}/health`).catch(() => console.log('⏳ Авто-пинг Render...'));
+  fetch(`${SELF_URL}/health`).catch(() => console.log('⏳ Автопинг Render...'));
 }, 5 * 60 * 1000);
 
+// =============================
+// 🚀 Запуск
+// =============================
 app.listen(PORT, () => {
   console.log(`✅ Сервер запущен на порту ${PORT}`);
   bot.launch();
   console.log("✅ Bot запущен!");
-
 });
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
