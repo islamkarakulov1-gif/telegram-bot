@@ -5,24 +5,19 @@ const { Telegraf, Markup } = require('telegraf');
 const express = require('express');
 const bodyParser = require('body-parser');
 const fetch = require('node-fetch');
-const LocalSession = require('telegraf-session-local'); // ✅ локальные сессии
+const LocalSession = require('telegraf-session-local');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_CHAT_ID = process.env.OWNER_CHAT_ID;
 const SELF_URL = process.env.SELF_URL;
 const PORT = process.env.PORT || 3000;
 
-// =============================
-// ⚙️ Проверка переменных окружения
-// =============================
 if (!BOT_TOKEN || !OWNER_CHAT_ID || !SELF_URL) {
   console.error("❌ Укажи BOT_TOKEN, OWNER_CHAT_ID и SELF_URL в .env");
   process.exit(1);
 }
 
-// =============================
-// 🧖 Медиа для саун
-// =============================
+// 🧖 Картинки
 const IMG_SMALL_URLS = [
   "https://i.ibb.co/ty5QdSg/IMG-20251010-WA0006.jpg",
   "https://i.ibb.co/sp2ZfMXx/IMG-20251010-WA0004.jpg",
@@ -37,17 +32,19 @@ const IMG_BIG_URLS = [
 
 const MAP_LINK_SMALL = "https://go.2gis.com/30tRT";
 const MAP_LINK_BIG = "https://go.2gis.com/OQSBA";
-
 const VIDEO_SMALL = "https://files.catbox.moe/y9slc1.mp4";
 const VIDEO_BIG = "https://files.catbox.moe/ol975e.mp4";
 
-// =============================
-// 🤖 Инициализация бота
-// =============================
+// 🤖 Инициализация
 const bot = new Telegraf(BOT_TOKEN);
 
-// ✅ Сессии хранятся в памяти (а не в файле)
-bot.use(new LocalSession({ storage: LocalSession.storageMemory }).middleware());
+// ✅ Локальные сессии с безопасной записью
+bot.use(new LocalSession({
+  database: 'sessions.json',
+  state: {},
+  property: 'session',
+  storage: LocalSession.storageFileSync
+}).middleware());
 
 // Главное меню
 const mainMenu = Markup.inlineKeyboard([
@@ -55,9 +52,7 @@ const mainMenu = Markup.inlineKeyboard([
   [Markup.button.callback('Сауна побольше', 'sauna_big')],
 ]);
 
-// =============================
-// 🧾 Инфо о саунах
-// =============================
+// Функция с инфо
 function getSaunaInfo(type) {
   if (type === 'small') {
     return {
@@ -88,20 +83,18 @@ function getSaunaInfo(type) {
   }
 }
 
-// =============================
 // 👋 Приветствие
-// =============================
-bot.on('message', async (ctx) => {
-  if (ctx.session && ctx.session.step) return;
-
-  const kaz = "Сәлем! Бізге хабарласқаныңыз үшін рахмет.";
-  const rus = "Привет! Спасибо за обращение.";
-  await ctx.reply(`${kaz}\n${rus}`, mainMenu);
+bot.start(async (ctx) => {
+  await ctx.reply("Сәлем! Бізге хабарласқаныңыз үшін рахмет.\nПривет! Спасибо за обращение.", mainMenu);
 });
 
-// =============================
-// 🖼 Фото + 🎥 Видео + Инфо
-// =============================
+bot.on('message', async (ctx) => {
+  if (!ctx.session.step) {
+    await ctx.reply("Выберите вариант:", mainMenu);
+  }
+});
+
+// 🖼 Инфо о саунах
 bot.action(['sauna_small', 'sauna_big'], async (ctx) => {
   await ctx.answerCbQuery();
   const type = ctx.callbackQuery.data === 'sauna_small' ? 'small' : 'big';
@@ -111,37 +104,32 @@ bot.action(['sauna_small', 'sauna_big'], async (ctx) => {
     for (const img of info.imgs) {
       await ctx.replyWithPhoto({ url: img });
     }
+    await ctx.replyWithVideo({ url: info.video });
 
-    if (info.video) {
-      await ctx.replyWithVideo({ url: info.video });
-    }
-
-    const text = `*${info.title}*\n\n${info.text_ru}\n\n📍 [Посмотреть на карте](${info.map})`;
-    await ctx.replyWithMarkdown(text, Markup.inlineKeyboard([
-      [Markup.button.callback('📅 Забронировать', `book_${type}`)],
-      [Markup.button.callback('🔙 Назад', 'back_to_menu')]
-    ]));
-  } catch (err) {
-    console.error("Ошибка при отправке фото/видео:", err.message);
-    await ctx.reply("⚠️ Ошибка при загрузке изображений. Попробуйте позже.");
+    await ctx.replyWithMarkdown(
+      `*${info.title}*\n\n${info.text_ru}\n\n📍 [Посмотреть на карте](${info.map})`,
+      Markup.inlineKeyboard([
+        [Markup.button.callback('📅 Забронировать', `book_${type}`)],
+        [Markup.button.callback('🔙 Назад', 'back_to_menu')]
+      ])
+    );
+  } catch (e) {
+    console.error(e);
+    await ctx.reply("⚠️ Ошибка при загрузке медиа.");
   }
 });
 
-// =============================
 // 🔙 Назад
-// =============================
 bot.action('back_to_menu', async (ctx) => {
   await ctx.answerCbQuery();
+  ctx.session = {};
   await ctx.reply('Главное меню:', mainMenu);
 });
 
-// =============================
 // 📝 Бронирование
-// =============================
 bot.action(/book_(.+)/, async (ctx) => {
   await ctx.answerCbQuery();
-  const type = ctx.match[1];
-  ctx.session.booking = { type };
+  ctx.session.booking = { type: ctx.match[1] };
   ctx.session.step = 'ask_name';
   await ctx.reply('Введите ваше имя:');
 });
@@ -152,48 +140,41 @@ bot.on('text', async (ctx) => {
   const step = ctx.session.step;
   const text = ctx.message.text;
 
-  if (step === 'ask_name') {
-    ctx.session.booking.name = text;
-    ctx.session.step = 'ask_phone';
-    return ctx.reply('Введите номер телефона:');
-  }
+  switch (step) {
+    case 'ask_name':
+      ctx.session.booking.name = text;
+      ctx.session.step = 'ask_phone';
+      return ctx.reply('Введите номер телефона:');
+    case 'ask_phone':
+      ctx.session.booking.phone = text;
+      ctx.session.step = 'ask_hours';
+      return ctx.reply('На сколько часов хотите забронировать?');
+    case 'ask_hours':
+      ctx.session.booking.hours = text;
+      const b = ctx.session.booking;
 
-  if (step === 'ask_phone') {
-    ctx.session.booking.phone = text;
-    ctx.session.step = 'ask_hours';
-    return ctx.reply('На сколько часов хотите забронировать?');
-  }
+      const title = b.type === 'small' ? 'Сауна поменьше' : 'Сауна побольше';
+      const summary = `🧖 Новая бронь:\n\n${title}\n👤 Имя: ${b.name}\n📞 Телефон: ${b.phone}\n⏰ Часов: ${b.hours}\n📍 ${b.type === 'small' ? MAP_LINK_SMALL : MAP_LINK_BIG}`;
 
-  if (step === 'ask_hours') {
-    ctx.session.booking.hours = text;
-    const b = ctx.session.booking;
-
-    const title = b.type === 'small' ? 'Сауна поменьше' : 'Сауна побольше';
-    const summary = `🧖 Новая бронь:\n\n${title}\n👤 Имя: ${b.name}\n📞 Телефон: ${b.phone}\n⏰ Часов: ${b.hours}\n📍 Карта: ${b.type === 'small' ? MAP_LINK_SMALL : MAP_LINK_BIG}`;
-
-    await ctx.telegram.sendMessage(OWNER_CHAT_ID, summary);
-    await ctx.reply('✅ Спасибо! Ваша заявка отправлена.');
-    ctx.session = {}; // очищаем сессию
+      await ctx.telegram.sendMessage(OWNER_CHAT_ID, summary);
+      await ctx.reply('✅ Спасибо! Ваша заявка отправлена.');
+      ctx.session = {};
+      break;
   }
 });
 
-// =============================
-// 🌐 Express для Render
-// =============================
+// 🌐 Render
 const app = express();
 app.use(bodyParser.json());
-
 app.get('/', (req, res) => res.send('✅ Бот работает — Render активен.'));
 app.get('/health', (req, res) => res.status(200).send('OK'));
 
-// 🕐 Автопинг Render каждые 5 минут
+// 🔄 Автопинг
 setInterval(() => {
   fetch(`${SELF_URL}/health`).catch(() => console.log('⏳ Автопинг Render...'));
 }, 5 * 60 * 1000);
 
-// =============================
-// 🚀 Запуск
-// =============================
+// 🚀 Старт
 app.listen(PORT, () => {
   console.log(`✅ Сервер запущен на порту ${PORT}`);
   bot.launch();
