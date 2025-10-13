@@ -1,8 +1,7 @@
-require('dotenv').config();
+require("dotenv").config();
 console.log("🚀 Bot запускается...");
 
 const express = require("express");
-const fetch = require("node-fetch");
 const { Telegraf, Markup } = require("telegraf");
 const LocalSession = require("telegraf-session-local");
 
@@ -63,7 +62,10 @@ const saunaInfo = {
 // Приветствие
 bot.on("message", async (ctx) => {
   if (ctx.session?.step) return;
-  await ctx.reply("Сәлем! Бізге хабарласқаныңыз үшін рахмет.\nПривет! Спасибо за обращение.", mainMenu);
+  await ctx.reply(
+    "Сәлем! Бізге хабарласқаныңыз үшін рахмет.\nПривет! Спасибо за обращение.",
+    mainMenu
+  );
 });
 
 // Вывод фото/видео
@@ -133,14 +135,21 @@ bot.on("text", async (ctx) => {
   }
 });
 
-// Express сервер (Render требует порт)
+// === EXPRESS + WEBHOOK ===
 const app = express();
-app.get("/", (req, res) => res.send("✅ Бот работает на Render!"));
-app.listen(PORT, async () => {
-  console.log(`✅ Сервер запущен на порту ${PORT}`);
+app.use(express.json());
 
-  const webhookUrl = `${SELF_URL}/bot${BOT_TOKEN}`;
-  await bot.telegram.setWebhook(webhookUrl);
-  app.use(bot.webhookCallback(`/bot${BOT_TOKEN}`));
-  console.log("✅ Webhook установлен:", webhookUrl);
+// endpoint для Render
+app.get("/", (req, res) => res.send("✅ Бот работает на Render!"));
+
+// подключаем Telegraf webhook
+const webhookPath = `/bot${BOT_TOKEN}`;
+app.use(bot.webhookCallback(webhookPath));
+
+const webhookUrl = `${SELF_URL}${webhookPath}`;
+bot.telegram.setWebhook(webhookUrl);
+
+app.listen(PORT, () => {
+  console.log(`✅ Сервер запущен на порту ${PORT}`);
+  console.log(`✅ Webhook активен: ${webhookUrl}`);
 });
